@@ -148,18 +148,19 @@ let rows = PRELOADED.rows.slice(); let start=0,end=0;
 function resize(){ c.width=c.clientWidth*devicePixelRatio; c.height=c.clientHeight*devicePixelRatio; ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0); draw(); }
 window.addEventListener('resize', resize);
 
-const MIN_VIEW_DAYS=5, DEFAULT_VIEW_DAYS=30;
+const MIN_VIEW_DAYS=5, DEFAULT_SPAN=30;
 function applyBounds(n){
-  const minSpan=Math.max(1, Math.min(MIN_VIEW_DAYS, n-1));
-  start=Math.max(0, Math.min(start, Math.max(0,n-minSpan))); end=Math.max(start+minSpan, Math.min(end,n));
-  sStart.min=0; sStart.max=Math.max(0,n-minSpan); sEnd.min=minSpan; sEnd.max=Math.max(minSpan,n);
-  const span=Math.max(minSpan, end-start); const midMin=Math.round(span/2), midMax=Math.max(midMin, n-Math.round(span/2));
-  sMid.min=midMin; sMid.max=midMax; sStart.value=start; sEnd.value=end; sMid.value=Math.round((start+end-1)/2);
-  const full=(start===0&&end===n); sStart.disabled=(n<=minSpan); sEnd.disabled=(n<=minSpan); sMid.disabled=(n<=span);
+  const minSpan=Math.max(1, Math.min(MIN_VIEW_DAYS, n));
+  start=Math.max(0, Math.min(start, Math.max(0,n-minSpan)));
+  end=Math.max(start+minSpan-1, Math.min(end,n-1));
+  sStart.min=0; sStart.max=Math.max(0,n-minSpan); sEnd.min=minSpan-1; sEnd.max=n-1;
+  const span=Math.max(minSpan, end-start+1); const midMin=Math.round(span/2)-1, midMax=Math.max(midMin, n-Math.round(span/2));
+  sMid.min=midMin; sMid.max=midMax; sStart.value=start; sEnd.value=end; sMid.value=Math.round((start+end)/2);
+  const full=(start===0&&end===n-1); sStart.disabled=(n<=minSpan); sEnd.disabled=(n<=minSpan); sMid.disabled=(n<=span);
 }
-function setWindowByPreset(days,n){
-  if(days===0){start=0;end=n;document.querySelectorAll('button[data-win]').forEach(b=>b.classList.remove('active'));btnAll.classList.add('active');}
-  else{ const span=Math.min(days,n); end=n; start=Math.max(0,n-span); document.querySelectorAll('button[data-win]').forEach(b=>b.classList.remove('active')); const t=document.querySelector('button[data-win="'+days+'"]'); if(t) t.classList.add('active'); }
+function setWindowByPreset(days, n=rows.length){
+  if(days===0){start=0;end=n-1;document.querySelectorAll('button[data-win]').forEach(b=>b.classList.remove('active'));btnAll.classList.add('active');}
+  else{ const span=Math.min(days,n); end=n-1; start=Math.max(0,n-span); document.querySelectorAll('button[data-win]').forEach(b=>b.classList.remove('active')); const t=document.querySelector('button[data-win="'+days+'"]'); if(t) t.classList.add('active'); }
   applyBounds(n); draw(); saveState();
 }
 
@@ -167,7 +168,7 @@ function saveState(){
   const s={thrG:parseFloat(thrGEl.value),thrR:parseFloat(thrREl.value),
     showBG:showBG.checked,showFused:showFused.checked,showHSI:showHSI.checked,showHSTE:showHSTE.checked,showCNH:showCNH.checked,showVHSI:showVHSI.checked,showBTC:showBTC.checked,
     startDate: rows[Math.max(0,Math.min(start,rows.length-1))]?.Date || null,
-    endDate: rows[Math.max(0,Math.min(end-1,rows.length-1))]?.Date || null };
+    endDate: rows[Math.max(0,Math.min(end,rows.length-1))]?.Date || null };
   try{localStorage.setItem(KEY_STATE,JSON.stringify(s));}catch(e){}
 }
 function loadState(){ try{ return JSON.parse(localStorage.getItem(KEY_STATE)||'null'); }catch(e){ return null; } }
@@ -180,10 +181,9 @@ function draw(){
   ctx.clearRect(0,0,c.clientWidth,c.clientHeight);
   const W=c.clientWidth,H=c.clientHeight;
   if(comp.length===0){stateBadge.textContent='狀態：—';stateBadge.className='badge status';rangeLabel.textContent='';return;}
-  const n=comp.length; if(end===0){const span=Math.min(DEFAULT_VIEW_DAYS, Math.max(1,n-1)); end=n; start=Math.max(0,n-span);}
-  applyBounds(n);
+  const n=comp.length; if(end===0){const span=Math.min(DEFAULT_SPAN, n); end=n-1; start=Math.max(0,n-span);} applyBounds(n);
   const latest=comp[n-1].state; stateBadge.textContent='狀態：'+latest; stateBadge.className='badge status '+(latest==='Green'?'':(latest==='Red'?'red':'range'));
-  const view=comp.slice(start,end);
+  const view=comp.slice(start,end+1);
   const padL=52,padR=22,padT=20,padB=48;
   const x=i=> padL + ((W-padL-padR)*(i/((view.length-1)||1)));
   const y=v=>{ const min=-4.2,max=4.2; return padT + (1-(v-min)/(max-min))*(H-padT-padB); };
@@ -211,14 +211,14 @@ function draw(){
 }
 
 function hookSliders(){ const n=rows.length;if(n===0) return;
-  sStart.oninput=function(){ const n=rows.length; const minSpan=Math.max(1, Math.min(5, n-1)); start=parseInt(sStart.value); end=Math.max(start+minSpan, end); applyBounds(n); draw(); saveState(); btnAll.classList.remove('active'); };
-  sEnd.oninput=function(){ const n=rows.length; const minSpan=Math.max(1, Math.min(5, n-1)); end=parseInt(sEnd.value); start=Math.min(end-minSpan, start); applyBounds(n); draw(); saveState(); btnAll.classList.remove('active'); };
-  sMid.oninput=function(){ const n=rows.length; const span=end-start; let ns=clamp(parseInt(sMid.value), Math.round(span/2), n-Math.round(span/2)); const newStart=ns-Math.round(span/2); start=newStart; end=start+span; applyBounds(n); draw(); saveState(); btnAll.classList.remove('active'); };
+  sStart.oninput=function(){ const n=rows.length; const minSpan=Math.max(1, Math.min(5, n)); start=parseInt(sStart.value); end=Math.max(start+minSpan-1, end); applyBounds(n); draw(); saveState(); btnAll.classList.remove('active'); };
+  sEnd.oninput=function(){ const n=rows.length; const minSpan=Math.max(1, Math.min(5, n)); end=parseInt(sEnd.value); start=Math.min(end-minSpan+1, start); applyBounds(n); draw(); saveState(); btnAll.classList.remove('active'); };
+  sMid.oninput=function(){ const n=rows.length; const span=end-start+1; let ns=clamp(parseInt(sMid.value), Math.round(span/2)-1, n-Math.round(span/2)); const newStart=ns-Math.round(span/2)+1; start=newStart; end=start+span-1; applyBounds(n); draw(); saveState(); btnAll.classList.remove('active'); };
 }
 [thrGEl,thrREl,showBG,showFused,showHSI,showHSTE,showCNH,showVHSI,showBTC].forEach(function(el){ el.addEventListener('change', function(){ draw(); saveState(); });});
 window.addEventListener('keydown',function(e){ if(!kbEnable.checked) return; const n=rows.length; if(n===0) return; const step=e.shiftKey?5:1;
-  if(e.key==='ArrowLeft'){ const span=end-start; const ns=Math.max(Math.round(span/2), Math.round((start+end-1)/2)-step); const newStart=ns-Math.round(span/2); start=newStart; end=start+span; applyBounds(n); draw(); e.preventDefault(); }
-  if(e.key==='ArrowRight'){ const span=end-start; const ns=Math.min(n-Math.round(span/2), Math.round((start+end-1)/2)+step); const newStart=ns-Math.round(span/2); start=newStart; end=start+span; applyBounds(n); draw(); e.preventDefault(); }
+  if(e.key==='ArrowLeft'){ const span=end-start+1; const center=Math.round((start+end)/2); const ns=Math.max(Math.round(span/2)-1, center-step); const newStart=ns-Math.round(span/2)+1; start=newStart; end=start+span-1; applyBounds(n); draw(); e.preventDefault(); }
+  if(e.key==='ArrowRight'){ const span=end-start+1; const center=Math.round((start+end)/2); const ns=Math.min(n-Math.round(span/2), center+step); const newStart=ns-Math.round(span/2)+1; start=newStart; end=start+span-1; applyBounds(n); draw(); e.preventDefault(); }
 });
 
 function extractGvizUrl(anyUrl){
@@ -265,29 +265,29 @@ async function fetchGvizJson(url){
   return out;
 }
 async function reloadFromSource(){
-  const input=(csvUrlEl.value||'').trim(); if(!input){ srcMsg.textContent='未設定來源，使用內嵌資料'; srcMsg.className='note'; rows=PRELOADED.rows.slice(); start=0; end=0; draw(); return; }
+  const input=(csvUrlEl.value||'').trim(); if(!input){ srcMsg.textContent='未設定來源，使用內嵌資料'; srcMsg.className='note'; rows=PRELOADED.rows.slice(); start=Math.max(0, rows.length-DEFAULT_SPAN); end=rows.length-1; applyBounds(rows.length); draw(); return; }
   srcMsg.textContent='抓取中…'; srcMsg.className='note';
   try{
     const csvText=await fetchCsvText(input);
     const parsed=parseCsv(csvText);
     if(parsed.length===0) throw new Error('CSV 無資料');
-    rows=parsed; start=0; end=0; draw(); srcMsg.textContent='已更新（CSV）'; srcMsg.className='note ok'; return;
+    rows=parsed; start=Math.max(0, rows.length-DEFAULT_SPAN); end=rows.length-1; applyBounds(rows.length); draw(); srcMsg.textContent='已更新（CSV）'; srcMsg.className='note ok'; return;
   }catch(e1){
     try{
       const gvizUrl=extractGvizUrl(input);
       const parsed=await fetchGvizJson(gvizUrl);
       if(parsed.length===0) throw new Error('gviz 無資料');
-      rows=parsed; start=0; end=0; draw(); srcMsg.textContent='已更新（gviz JSON）'; srcMsg.className='note ok'; return;
+      rows=parsed; start=Math.max(0, rows.length-DEFAULT_SPAN); end=rows.length-1; applyBounds(rows.length); draw(); srcMsg.textContent='已更新（gviz JSON）'; srcMsg.className='note ok'; return;
     }catch(e2){
       console.error('CSV 錯誤:',e1,'GVIZ 錯誤:',e2);
       srcMsg.textContent='抓取失敗：' + (e2 && e2.message ? e2.message : (e1 && e1.message ? e1.message : '未知錯誤')) + '（已回退內嵌資料）'; srcMsg.className='note err';
-      rows=PRELOADED.rows.slice(); start=0; end=0; draw();
+      rows=PRELOADED.rows.slice(); start=Math.max(0, rows.length-DEFAULT_SPAN); end=rows.length-1; applyBounds(rows.length); draw();
     }
   }
 }
 
 document.querySelectorAll('button[data-win]').forEach(function(btn){
-  btn.addEventListener('click',function(){ document.querySelectorAll('button[data-win]').forEach(function(b){b.classList.remove('active');}); btn.classList.add('active'); const days=parseInt(btn.dataset.win)||0; setWindowByPreset(days,rows.length); });
+  btn.addEventListener('click',function(){ const days=parseInt(btn.dataset.win)||0; setWindowByPreset(days); });
 });
 function initSrcUi(){
   const saved=loadSrc();
@@ -304,10 +304,10 @@ function initSrcUi(){
   initSrcUi();
   const persisted=loadState(); if(persisted){ try{ thrGEl.value=isFinite(persisted.thrG)?persisted.thrG:0.5; thrREl.value=isFinite(persisted.thrR)?persisted.thrR:-0.5;
     showBG.checked=persisted.showBG!==false; showFused.checked=persisted.showFused!==false; showHSI.checked=!!persisted.showHSI; showHSTE.checked=!!persisted.showHSTE; showCNH.checked=!!persisted.showCNH; showVHSI.checked=!!persisted.showVHSI; showBTC.checked=!!persisted.showBTC; }catch(e){} }
-  setWindowByPreset(30, rows.length); hookSliders(); resize();
+  setWindowByPreset(DEFAULT_SPAN); hookSliders(); resize();
   const saved=loadSrc(); if(saved || DEFAULT_SOURCE){ reloadFromSource(); }
 })();
-btnReset.addEventListener('click',function(){ thrGEl.value=0.5; thrREl.value=-0.5; showBG.checked=true; showFused.checked=true; showHSI.checked=false; showHSTE.checked=false; showCNH.checked=false; showVHSI.checked=false; showBTC.checked=false; setWindowByPreset(30, rows.length); saveState(); });
+btnReset.addEventListener('click',function(){ thrGEl.value=0.5; thrREl.value=-0.5; showBG.checked=true; showFused.checked=true; showHSI.checked=false; showHSTE.checked=false; showCNH.checked=false; showVHSI.checked=false; showBTC.checked=false; setWindowByPreset(DEFAULT_SPAN); saveState(); });
 </script>
 </body>
 </html>
