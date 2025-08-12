@@ -17,8 +17,11 @@
 fieldset{border:1px dashed var(--border);padding:6px 10px;border-radius:10px}
 legend{padding:0 6px;color:#374151}
 small.hint{color:#6b7280}
-.btns button{padding:4px 10px;border:1px solid var(--border);border-radius:8px;background:#fff;cursor:pointer}
-.btns button.active{background:#111827;color:#fff;border-color:#111827}
+.btn{padding:4px 10px;border:1px solid var(--border);border-radius:8px;background:#fff;cursor:pointer}
+.btn--future{background:linear-gradient(135deg,#3b82f6,#9333ea);color:#fff;box-shadow:0 0 6px rgba(147,51,234,.5);transition:all .3s ease}
+.btn--future:hover{box-shadow:0 0 12px rgba(147,51,234,.8);transform:translateY(-2px)}
+.btn--future:active{box-shadow:0 0 8px rgba(147,51,234,.6);transform:translateY(0)}
+.btns .btn.active{box-shadow:0 0 15px rgba(59,130,246,.8)}
 .canvas-box{position:relative;margin:12px;height:56vh;min-height:360px;border:1px solid var(--border);border-radius:12px;overflow:hidden}
 canvas{width:100%;height:100%;display:block;background:#fff}
 .tooltip{position:fixed;pointer-events:none;background:#111827;color:#fff;padding:8px 10px;border-radius:8px;font-size:12px;opacity:0;transition:opacity .12s;max-width:260px;box-shadow:0 8px 20px rgba(0,0,0,.15)}
@@ -37,9 +40,9 @@ canvas{width:100%;height:100%;display:block;background:#fff}
 .kb{display:flex;align-items:center;gap:8px}
 .src{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-left:auto}
 .src input[type=url]{width:460px;max-width:70vw;padding:6px 8px;border:1px solid var(--border);border-radius:8px}
-.src button{padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:#fff;cursor:pointer}
 .note{color:#64748b;font-size:12px;margin-left:8px}
 .err{color:#991b1b}.ok{color:#047857}
+#btnReset{margin-left:auto}
 </style>
 </head>
 <body>
@@ -47,16 +50,16 @@ canvas{width:100%;height:100%;display:block;background:#fff}
   <div class="toolbar">
     <div id="stateBadge" class="badge status">狀態：—</div>
     <div class="btns">
-      <button data-win="365">1Y</button>
-      <button data-win="180">6M</button>
-      <button data-win="90">3M</button>
-      <button data-win="30" class="active">1M</button>
-      <button data-win="0" id="btnAll">全部</button>
+      <button data-win="365" class="btn btn--future">1Y</button>
+      <button data-win="180" class="btn btn--future">6M</button>
+      <button data-win="90" class="btn btn--future">3M</button>
+      <button data-win="30" class="btn btn--future active">1M</button>
+      <button data-win="0" id="btnAll" class="btn btn--future">全部</button>
     </div>
     <div class="src">
       <input id="csvUrl" type="url" placeholder="貼 Google Sheets 連結：支援『發佈到網路 CSV』或『編輯/檢視』網址" />
-      <button id="btnSaveSrc">儲存連結</button>
-      <button id="btnRefresh">立即更新</button>
+      <button id="btnSaveSrc" class="btn btn--future">儲存連結</button>
+      <button id="btnRefresh" class="btn btn--future">立即更新</button>
       <span id="srcMsg" class="note"></span>
     </div>
   </div>
@@ -81,7 +84,7 @@ canvas{width:100%;height:100%;display:block;background:#fff}
       <label><input type="checkbox" id="kbEnable" checked> 鍵盤微調</label>
       <small class="hint">←/→ ±1 天，Shift＋箭頭＝±5 天</small>
     </div>
-    <button id="btnReset" style="margin-left:auto;padding:4px 10px;border:1px solid var(--border);border-radius:8px;background:#fff;cursor:pointer">重設</button>
+    <button id="btnReset" class="btn btn--future">重設</button>
   </div>
 
   <div class="canvas-box">
