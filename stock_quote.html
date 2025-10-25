@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <title>即時股價報價機</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      background: linear-gradient(135deg, #89f7fe, #66a6ff);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .card {
+      background: #ffffff;
+      padding: 2rem;
+      border-radius: 1rem;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+      width: 320px;
+    }
+    h1 {
+      font-size: 1.4rem;
+      margin-top: 0;
+      text-align: center;
+    }
+    input {
+      width: 100%;
+      padding: 0.5rem;
+      border: 1px solid #ccc;
+      border-radius: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    button {
+      width: 100%;
+      padding: 0.5rem;
+      background: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 0.5rem;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    .price {
+      text-align: center;
+      font-size: 2rem;
+      margin-top: 1rem;
+    }
+    .error {
+      color: #c00;
+      font-size: 0.9rem;
+      text-align: center;
+      margin-top: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>即時股價</h1>
+    <input id="symbol" placeholder="輸入股票代號，例如 AAPL" value="AAPL" />
+    <button id="fetchBtn">取得報價</button>
+    <div id="price" class="price">--</div>
+    <div id="error" class="error"></div>
+  </div>
+  <script>
+    async function fetchPrice() {
+      const sym = document.getElementById('symbol').value.trim().toUpperCase();
+      const priceEl = document.getElementById('price');
+      const errEl = document.getElementById('error');
+      errEl.textContent = '';
+      priceEl.textContent = '載入中...';
+      try {
+        const res = await fetch(`https://query1.finance.yahoo.com/v7/finance/quote?symbols=${sym}`);
+        const data = await res.json();
+        const quote = data.quoteResponse.result[0];
+        if (!quote) throw new Error('找不到股票代號');
+        priceEl.textContent = quote.regularMarketPrice;
+      } catch (e) {
+        priceEl.textContent = '--';
+        errEl.textContent = '取得資料失敗: ' + e.message;
+      }
+    }
+    document.getElementById('fetchBtn').addEventListener('click', fetchPrice);
+    document.getElementById('symbol').addEventListener('keydown', e => {
+      if (e.key === 'Enter') fetchPrice();
+    });
+    fetchPrice();
+    setInterval(fetchPrice, 60000);
+  </script>
+</body>
+</html>
