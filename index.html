@@ -114,11 +114,41 @@ const thrGEl=$('#thrG'), thrREl=$('#thrR'); const sStart=$('#sStart'), sMid=$('#
 const rangeLabel=$('#rangeLabel'); const btnAll=$('#btnAll'); const kbEnable=$('#kbEnable'); const btnReset=$('#btnReset');
 const btnRefresh=$('#btnRefresh'), srcMsg=$('#srcMsg');
 
-function SMA(a,n,i){ if(i+1<n) return NaN; let s=0; for(let k=i-n+1;k<=i;k++) s+=a[k]; return s/n; }
-function pct(a,p,i){ if(i<p) return NaN; const x=a[i-p], y=a[i]; if(x==null||x==0) return NaN; return (y-x)/x; }
-function nRiskOn(c,i){ const A=c[i]>SMA(c,200,i), B=c[i]>SMA(c,50,i), C=pct(c,20,i)>0, D=pct(c,60,i)>0; const s=(A+B+C+D)/4; return s*2-1; }
-function nCNH(c,i){ const A=c[i]<SMA(c,200,i), B=c[i]<SMA(c,50,i), C=pct(c,20,i)<0, D=pct(c,60,i)<0; const s=(A+B+C+D)/4; return s*2-1; }
-function nVHSI(c,i){ const A=c[i]<SMA(c,50,i), C=pct(c,20,i)<0, D=pct(c,60,i)<0; const s=(A+C+D)/3; return s*2-1; }
+function isNum(v){ return Number.isFinite(v); }
+function SMA(a,n,i){
+  if(i+1<n) return NaN;
+  let s=0;
+  for(let k=i-n+1;k<=i;k++){
+    const v=a[k];
+    if(!isNum(v)) return NaN;
+    s+=v;
+  }
+  return s/n;
+}
+function pct(a,p,i){
+  if(i<p) return NaN;
+  const x=a[i-p], y=a[i];
+  if(!isNum(x) || !isNum(y) || x===0) return NaN;
+  return (y-x)/x;
+}
+function nRiskOn(c,i){
+  const cur=c[i], s200=SMA(c,200,i), s50=SMA(c,50,i), p20=pct(c,20,i), p60=pct(c,60,i);
+  if(!isNum(cur) || !isNum(s200) || !isNum(s50) || !isNum(p20) || !isNum(p60)) return NaN;
+  const s=((cur>s200)+(cur>s50)+(p20>0)+(p60>0))/4;
+  return s*2-1;
+}
+function nCNH(c,i){
+  const cur=c[i], s200=SMA(c,200,i), s50=SMA(c,50,i), p20=pct(c,20,i), p60=pct(c,60,i);
+  if(!isNum(cur) || !isNum(s200) || !isNum(s50) || !isNum(p20) || !isNum(p60)) return NaN;
+  const s=((cur<s200)+(cur<s50)+(p20<0)+(p60<0))/4;
+  return s*2-1;
+}
+function nVHSI(c,i){
+  const cur=c[i], s50=SMA(c,50,i), p20=pct(c,20,i), p60=pct(c,60,i);
+  if(!isNum(cur) || !isNum(s50) || !isNum(p20) || !isNum(p60)) return NaN;
+  const s=((cur<s50)+(p20<0)+(p60<0))/3;
+  return s*2-1;
+}
 
 function compute(rows, thrG=0.5, thrR=-0.5){
   rows=rows.slice().sort((a,b)=>a.Date.localeCompare(b.Date));
