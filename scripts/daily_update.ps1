@@ -18,22 +18,52 @@ function Invoke-Checked {
     [string]$Exe,
     [string[]]$CmdArgs
   )
-  & $Exe @CmdArgs
-  if ($LASTEXITCODE -ne 0) {
-    throw "$Exe $($CmdArgs -join ' ') failed with exit code $LASTEXITCODE"
+  Write-Log "RUN: $Exe $($CmdArgs -join ' ')"
+  $prevErrorActionPreference = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  $hasNativePref = $null -ne (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction SilentlyContinue)
+  if ($hasNativePref) {
+    $prevNativePref = $PSNativeCommandUseErrorActionPreference
+    $PSNativeCommandUseErrorActionPreference = $false
   }
+
+  try {
+    $output = & $Exe @CmdArgs 2>&1
+    $exitCode = $LASTEXITCODE
+  }
+  finally {
+    $ErrorActionPreference = $prevErrorActionPreference
+    if ($hasNativePref) {
+      $PSNativeCommandUseErrorActionPreference = $prevNativePref
+    }
+  }
+
+  foreach ($line in $output) {
+    Write-Log "  $line"
+  }
+
+  if ($exitCode -ne 0) {
+    throw "$Exe $($CmdArgs -join ' ') failed with exit code $exitCode"
+  }
+}
+
+function Invoke-PythonUpdate {
+  param([string]$ScriptPath)
+
+  if (Get-Command py -ErrorAction SilentlyContinue) {
+    Invoke-Checked -Exe "py" -CmdArgs @("-3", $ScriptPath)
+    return
+  }
+
+  Invoke-Checked -Exe "python" -CmdArgs @($ScriptPath)
 }
 
 Write-Log "=== Daily update start ==="
 
 Push-Location $Repo
 try {
-  Invoke-Checked -Exe "git" -CmdArgs @("pull", "--rebase", "origin", "main")
-
-  & python $PyScript
-  if ($LASTEXITCODE -ne 0) {
-    throw "Python update script failed with exit code $LASTEXITCODE"
-  }
+  Invoke-Checked -Exe "git" -CmdArgs @("-c", "rebase.autoStash=true", "pull", "--rebase", "origin", "main")
+  Invoke-PythonUpdate -ScriptPath $PyScript
 
   git add -- "data/hsi5f.csv"
   git diff --cached --quiet
