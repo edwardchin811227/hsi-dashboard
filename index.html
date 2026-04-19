@@ -218,7 +218,10 @@ function draw(){
   const y=v=>{ const min=-4.2,max=4.2; return padT + (1-(v-min)/(max-min))*(H-padT-padB); };
   if(showBG.checked && view.length>0){ let s=0,cur=view[0].state; for(let i=1;i<view.length;i++){ if(view[i].state!==cur){ shade(s,i-1,cur); s=i; cur=view[i].state; } } shade(s,view.length-1,cur);
     function shade(a,b,st){ const color=st==='Green'?COLORS.greenBG:(st==='Red'?COLORS.redBG:COLORS.rangeBG); const x0=x(a),x1=x(b); ctx.fillStyle=color; ctx.fillRect(x0,padT,Math.max(1,x1-x0),H-padT-padB); } }
-  ctx.strokeStyle=COLORS.grid; ctx.setLineDash([4,4]); ctx.beginPath(); [-3,-2,-1,0,1,2,3].forEach(function(v){const yy=y(v); ctx.moveTo(padL,yy); ctx.lineTo(W-padR,yy);}); ctx.stroke(); ctx.setLineDash([]);
+  const gridLevels=[-3,-2,-1,0,1,2,3];
+  ctx.strokeStyle=COLORS.grid; ctx.setLineDash([4,4]); ctx.beginPath(); gridLevels.forEach(function(v){const yy=y(v); ctx.moveTo(padL,yy); ctx.lineTo(W-padR,yy);}); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle='#94a3b8'; ctx.font='11px system-ui'; ctx.textAlign='right'; ctx.textBaseline='middle';
+  gridLevels.forEach(function(v){ ctx.fillText(String(v), padL-8, y(v)); });
   function drawLine(arr,color,lw=1.8){ ctx.strokeStyle=color; ctx.lineWidth=lw; ctx.beginPath(); for(let i=0;i<arr.length;i++){ const px=x(i),py=y(arr[i]); if(i) ctx.lineTo(px,py); else ctx.moveTo(px,py);} ctx.stroke(); }
   const fused=view.map(d=>d.disp), HSI=view.map(d=>d.vals.HSI*4), HSTE=view.map(d=>d.vals.HSTE*4), CNH=view.map(d=>d.vals.CNH*4), VHSI=view.map(d=>d.vals.VHSI*4), BTC=view.map(d=>d.vals.BTC*4);
   if(showFused.checked) drawLine(fused,COLORS.fused,2.8);
