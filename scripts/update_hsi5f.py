@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import datetime as dt
 import json
 import math
@@ -16,7 +17,6 @@ import warnings
 import os as _os
 import sys as _sys
 
-# Suppress yfinance debug/rate-limit noise
 warnings.filterwarnings("ignore")
 yf.set_tz_cache_location(None)
 
@@ -138,7 +138,7 @@ def _last_le(series: pd.Series, d: pd.Timestamp) -> float:
     return float(s.iloc[-1])
 
 
-def build_dataset(existing: pd.DataFrame) -> pd.DataFrame:
+def build_dataset(existing: pd.DataFrame, backfill_days: int = 0) -> pd.DataFrame:
     s = _session()
     hsi = _load_hsi(s)
     btc = _load_btc(s)
@@ -152,6 +152,8 @@ def build_dataset(existing: pd.DataFrame) -> pd.DataFrame:
         raise RuntimeError("Existing data file is empty; initialize it manually first.")
 
     max_existing = existing["Date"].max()
+    if backfill_days > 0:
+        max_existing = max_existing - pd.Timedelta(days=backfill_days)
     target_dates = hsi.loc[hsi["Date"] > max_existing, "Date"].drop_duplicates().sort_values()
     if target_dates.empty:
         return existing
@@ -238,9 +240,16 @@ def _normalize_for_compare(df: pd.DataFrame) -> pd.DataFrame:
     return out[["Date", "HSI", "HSTECH", "USDCNH", "VHSI", "BTC"]]
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Update HSI 5-factor dataset")
+    parser.add_argument("--backfill-days", type=int, default=0, help="Recompute last N days")
+    return parser.parse_args()
+
+
 def main() -> int:
+    args = parse_args()
     before = _load_existing()
-    after = build_dataset(before)
+    after = build_dataset(before, backfill_days=args.backfill_days)
 
     if _normalize_for_compare(before).equals(_normalize_for_compare(after)):
         print(
