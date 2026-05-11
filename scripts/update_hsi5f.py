@@ -108,7 +108,7 @@ def _load_btc(s: requests.Session) -> pd.DataFrame:
 
 
 def _load_hstech_proxy(s: requests.Session) -> pd.DataFrame:
-    return _yf_download("^HSTECH", "2020-07-27", "HSTECH_proxy")
+    return _yf_download("HSTECH.HK", "2020-07-27", "HSTECH_proxy")
 
 
 def _load_vix(s: requests.Session) -> pd.DataFrame:
