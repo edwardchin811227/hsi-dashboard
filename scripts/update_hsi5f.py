@@ -11,6 +11,14 @@ from typing import Iterable
 import numpy as np
 import pandas as pd
 import requests
+import yfinance as yf
+import warnings
+import os as _os
+import sys as _sys
+
+# Suppress yfinance debug/rate-limit noise
+warnings.filterwarnings("ignore")
+yf.set_tz_cache_location(None)
 
 
 REPO = Path(__file__).resolve().parents[1]
@@ -18,10 +26,6 @@ DATA_FILE = REPO / "data" / "hsi5f.csv"
 START_DATE = pd.Timestamp("2018-01-01")
 HSTECH_OFFICIAL_START = pd.Timestamp("2020-07-27")
 
-
-URL_HSI = "https://stooq.com/q/d/l/?s=^hsi&i=d"
-URL_BTC = "https://stooq.com/q/d/l/?s=btcusd&i=d"
-URL_HSTECH_PROXY = "https://stooq.com/q/d/l/?s=3032.hk&i=d"
 URL_VIX = "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv"
 
 
@@ -38,7 +42,7 @@ def _get_text(s: requests.Session, url: str, retries: int = 5) -> str:
             r = s.get(url, timeout=40)
             r.raise_for_status()
             return r.text
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             last_err = exc
             time.sleep(1.5 * (i + 1))
     raise RuntimeError(f"Failed to fetch {url}: {last_err}")
@@ -72,25 +76,39 @@ def _load_existing() -> pd.DataFrame:
     return df.sort_values("Date").drop_duplicates(subset=["Date"], keep="last")
 
 
+def _yf_download(ticker: str, start: str, label: str) -> pd.DataFrame:
+    for attempt in range(3):
+        try:
+            with open(_os.devnull, "w") as fnull:
+                old_stderr = _sys.stderr
+                _sys.stderr = fnull
+                try:
+                    df = yf.download(ticker, start=start, progress=False, timeout=30)
+                finally:
+                    _sys.stderr = old_stderr
+            if df is not None and not df.empty:
+                df = df.reset_index()
+                df = df.rename(columns={"Date": "Date", "Close": label})
+                df["Date"] = pd.to_datetime(df["Date"]).dt.tz_localize(None)
+                df[label] = pd.to_numeric(df[label], errors="coerce")
+                return df[["Date", label]].dropna(subset=["Date"]).sort_values("Date")
+        except Exception:
+            pass
+        if attempt < 2:
+            time.sleep(10)
+    return pd.DataFrame(columns=["Date", label])
+
+
 def _load_hsi(s: requests.Session) -> pd.DataFrame:
-    hsi = pd.read_csv(StringIO(_get_text(s, URL_HSI)))
-    hsi["Date"] = pd.to_datetime(hsi["Date"])
-    hsi["HSI"] = pd.to_numeric(hsi["Close"], errors="coerce")
-    return hsi[["Date", "HSI"]].dropna(subset=["Date"]).sort_values("Date")
+    return _yf_download("^HSI", "2018-01-01", "HSI")
 
 
 def _load_btc(s: requests.Session) -> pd.DataFrame:
-    btc = pd.read_csv(StringIO(_get_text(s, URL_BTC)))
-    btc["Date"] = pd.to_datetime(btc["Date"])
-    btc["BTC"] = pd.to_numeric(btc["Close"], errors="coerce")
-    return btc[["Date", "BTC"]].dropna(subset=["Date"]).sort_values("Date")
+    return _yf_download("BTC-USD", "2018-01-01", "BTC")
 
 
 def _load_hstech_proxy(s: requests.Session) -> pd.DataFrame:
-    pxy = pd.read_csv(StringIO(_get_text(s, URL_HSTECH_PROXY)))
-    pxy["Date"] = pd.to_datetime(pxy["Date"])
-    pxy["HSTECH_proxy"] = pd.to_numeric(pxy["Close"], errors="coerce")
-    return pxy[["Date", "HSTECH_proxy"]].dropna(subset=["Date"]).sort_values("Date")
+    return _yf_download("^HSTECH", "2020-07-27", "HSTECH_proxy")
 
 
 def _load_vix(s: requests.Session) -> pd.DataFrame:
@@ -138,7 +156,6 @@ def build_dataset(existing: pd.DataFrame) -> pd.DataFrame:
     if target_dates.empty:
         return existing
 
-    # Build mappings on historical overlap using existing stable data.
     fit_h = _fit_linear(
         x=existing.merge(h_proxy, on="Date", how="inner")["HSTECH_proxy"],
         y=existing.merge(h_proxy, on="Date", how="inner")["HSTECH"],
