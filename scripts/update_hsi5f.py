@@ -18,7 +18,7 @@ import os as _os
 import sys as _sys
 
 warnings.filterwarnings("ignore")
-yf.set_tz_cache_location(None)
+yf.set_tz_cache_location("/tmp/yf_tz_cache")
 
 
 REPO = Path(__file__).resolve().parents[1]
@@ -87,6 +87,9 @@ def _yf_download(ticker: str, start: str, label: str) -> pd.DataFrame:
                 finally:
                     _sys.stderr = old_stderr
             if df is not None and not df.empty:
+                # Flatten MultiIndex columns returned by newer yfinance
+                if isinstance(df.columns, pd.MultiIndex):
+                    df.columns = df.columns.droplevel(1)
                 df = df.reset_index()
                 df = df.rename(columns={"Date": "Date", "Close": label})
                 df["Date"] = pd.to_datetime(df["Date"]).dt.tz_localize(None)
