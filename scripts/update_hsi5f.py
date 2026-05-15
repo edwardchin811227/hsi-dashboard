@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import datetime as dt
-import json
 import math
 import time
 from io import StringIO
@@ -121,17 +119,9 @@ def _load_vix(s: requests.Session) -> pd.DataFrame:
     return vix[["Date", "VIX"]].dropna(subset=["Date"]).sort_values("Date")
 
 
-def _load_usdcny(s: requests.Session) -> pd.DataFrame:
-    end = dt.date.today().isoformat()
-    url = f"https://api.frankfurter.app/{START_DATE.date()}..{end}?from=USD&to=CNY"
-    obj = json.loads(_get_text(s, url))
-    rows = [{"Date": k, "USDCNH": v.get("CNY")} for k, v in obj.get("rates", {}).items()]
-    fx = pd.DataFrame(rows)
-    if fx.empty:
-        return pd.DataFrame(columns=["Date", "USDCNH"])
-    fx["Date"] = pd.to_datetime(fx["Date"])
-    fx["USDCNH"] = pd.to_numeric(fx["USDCNH"], errors="coerce")
-    return fx[["Date", "USDCNH"]].sort_values("Date")
+def _load_usdcny() -> pd.DataFrame:
+    return _yf_download("CNH=X", "2018-01-01", "USDCNH")
+
 
 
 def _last_le(series: pd.Series, d: pd.Timestamp) -> float:
@@ -145,7 +135,7 @@ def build_dataset(existing: pd.DataFrame, backfill_days: int = 0) -> pd.DataFram
     s = _session()
     hsi = _load_hsi(s)
     btc = _load_btc(s)
-    fx = _load_usdcny(s)
+    fx = _load_usdcny()
     h_proxy = _load_hstech_proxy(s)
     vix = _load_vix(s)
 
