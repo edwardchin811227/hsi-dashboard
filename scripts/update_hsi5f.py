@@ -176,11 +176,6 @@ def build_dataset(existing: pd.DataFrame, backfill_days: int = 0) -> pd.DataFram
     hp_s = h_proxy.set_index("Date")["HSTECH_proxy"].sort_index()
     vix_s = vix.set_index("Date")["VIX"].sort_index()
 
-    last_hsi = float(existing["HSI"].dropna().iloc[-1])
-    last_btc = float(existing["BTC"].dropna().iloc[-1])
-    last_fx = float(existing["USDCNH"].dropna().iloc[-1])
-    last_vhsi = float(existing["VHSI"].dropna().iloc[-1])
-
     rows: list[dict[str, float | pd.Timestamp]] = []
     for d in target_dates:
         hsi_val = _last_le(hsi_s, d)
@@ -202,22 +197,13 @@ def build_dataset(existing: pd.DataFrame, backfill_days: int = 0) -> pd.DataFram
         rows.append(
             {
                 "Date": d,
-                "HSI": hsi_val if math.isfinite(hsi_val) else last_hsi,
+                "HSI": hsi_val if math.isfinite(hsi_val) else float("nan"),
                 "HSTECH": hstech_val,
-                "USDCNH": fx_val if math.isfinite(fx_val) else last_fx,
-                "VHSI": vhsi_val if math.isfinite(vhsi_val) else last_vhsi,
-                "BTC": btc_val if math.isfinite(btc_val) else last_btc,
+                "USDCNH": fx_val if math.isfinite(fx_val) else float("nan"),
+                "VHSI": vhsi_val if math.isfinite(vhsi_val) else float("nan"),
+                "BTC": btc_val if math.isfinite(btc_val) else float("nan"),
             }
         )
-
-        if math.isfinite(hsi_val):
-            last_hsi = float(hsi_val)
-        if math.isfinite(btc_val):
-            last_btc = float(btc_val)
-        if math.isfinite(fx_val):
-            last_fx = float(fx_val)
-        if math.isfinite(vhsi_val):
-            last_vhsi = float(vhsi_val)
 
     update_df = pd.DataFrame(rows)
     keep_df = existing.loc[~existing["Date"].isin(update_df["Date"])].copy()
