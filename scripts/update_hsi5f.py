@@ -100,8 +100,31 @@ def _yf_download(ticker: str, start: str, label: str) -> pd.DataFrame:
     return pd.DataFrame(columns=["Date", label])
 
 
+def _merge_latest_tick(main: pd.DataFrame, ticker: str, label: str) -> pd.DataFrame:
+    for attempt in range(2):
+        try:
+            t = yf.Ticker(ticker)
+            recent = t.history(period="1d")
+            if recent is None or recent.empty:
+                return main
+            recent = recent.reset_index()
+            recent["Date"] = pd.to_datetime(recent["Date"]).dt.tz_localize(None)
+            recent[label] = pd.to_numeric(recent["Close"], errors="coerce")
+            recent = recent[["Date", label]].dropna(subset=["Date", label])
+            if not main.empty:
+                recent = recent[~recent["Date"].isin(main["Date"])]
+            if not recent.empty:
+                main = pd.concat([main, recent], ignore_index=True).sort_values("Date")
+            break
+        except Exception:
+            if attempt < 1:
+                time.sleep(5)
+    return main
+
+
 def _load_hsi(s: requests.Session) -> pd.DataFrame:
-    return _yf_download("^HSI", "2018-01-01", "HSI")
+    main = _yf_download("^HSI", "2018-01-01", "HSI")
+    return _merge_latest_tick(main, "^HSI", "HSI")
 
 
 def _load_btc(s: requests.Session) -> pd.DataFrame:
@@ -109,7 +132,8 @@ def _load_btc(s: requests.Session) -> pd.DataFrame:
 
 
 def _load_hstech_proxy(s: requests.Session) -> pd.DataFrame:
-    return _yf_download("HSTECH.HK", "2020-07-27", "HSTECH_proxy")
+    main = _yf_download("HSTECH.HK", "2020-07-27", "HSTECH_proxy")
+    return _merge_latest_tick(main, "HSTECH.HK", "HSTECH_proxy")
 
 
 def _load_vix(s: requests.Session) -> pd.DataFrame:
@@ -120,7 +144,8 @@ def _load_vix(s: requests.Session) -> pd.DataFrame:
 
 
 def _load_usdcny() -> pd.DataFrame:
-    return _yf_download("CNH=X", "2018-01-01", "USDCNH")
+    main = _yf_download("CNH=X", "2018-01-01", "USDCNH")
+    return _merge_latest_tick(main, "CNH=X", "USDCNH")
 
 
 
