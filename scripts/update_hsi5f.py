@@ -89,6 +89,8 @@ def _yf_download(ticker: str, start: str, label: str) -> pd.DataFrame:
                 if isinstance(df.columns, pd.MultiIndex):
                     df.columns = df.columns.droplevel(1)
                 df = df.reset_index()
+                if "Date" not in df.columns and "index" in df.columns:
+                    df = df.rename(columns={"index": "Date"})
                 df = df.rename(columns={"Date": "Date", "Close": label})
                 df["Date"] = pd.to_datetime(df["Date"]).dt.tz_localize(None)
                 df[label] = pd.to_numeric(df[label], errors="coerce")
@@ -115,6 +117,7 @@ def _merge_latest_tick(main: pd.DataFrame, ticker: str, label: str) -> pd.DataFr
                 recent = recent[~recent["Date"].isin(main["Date"])]
             if not recent.empty:
                 main = pd.concat([main, recent], ignore_index=True).sort_values("Date")
+                main["Date"] = pd.to_datetime(main["Date"]).dt.tz_localize(None)
             break
         except Exception:
             if attempt < 1:
@@ -225,6 +228,13 @@ def build_dataset(existing: pd.DataFrame, backfill_days: int = 0) -> pd.DataFram
     out = pd.concat([keep_df, update_df], ignore_index=True)
     out = out[["Date", "HSI", "HSTECH", "USDCNH", "VHSI", "BTC"]]
     out = out.sort_values("Date").drop_duplicates(subset=["Date"], keep="last")
+
+    existing_by_date = existing.set_index("Date")
+    out_by_date = out.set_index("Date")
+    for col in ["HSI", "HSTECH", "USDCNH", "VHSI", "BTC"]:
+        out_by_date[col] = out_by_date[col].combine_first(existing_by_date[col])
+    out = out_by_date.reset_index()
+
     return out
 
 
