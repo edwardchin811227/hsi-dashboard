@@ -29,6 +29,11 @@ URL_VIX = "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.c
 
 def _session() -> requests.Session:
     s = requests.Session()
+    # CBOE's CSV endpoint currently fails through the NAS proxy with
+    # SSL EOF errors, while direct access from the container works.
+    # yfinance does not use this requests session, so keep this session
+    # independent from HTTP(S)_PROXY environment variables.
+    s.trust_env = False
     s.headers.update({"User-Agent": "Mozilla/5.0"})
     return s
 
@@ -165,7 +170,6 @@ def build_dataset(existing: pd.DataFrame, backfill_days: int = 0) -> pd.DataFram
     btc = _load_btc(s)
     fx = _load_usdcny()
     h_proxy = _load_hstech_proxy(s)
-    vix = _load_vix(s)
 
     hsi = hsi[hsi["Date"] >= START_DATE].copy()
     existing = existing[existing["Date"] >= START_DATE].copy()
@@ -178,6 +182,17 @@ def build_dataset(existing: pd.DataFrame, backfill_days: int = 0) -> pd.DataFram
     target_dates = hsi.loc[hsi["Date"] > max_existing, "Date"].drop_duplicates().sort_values()
     if target_dates.empty:
         return existing
+
+    try:
+        vix = _load_vix(s)
+    except Exception as exc:
+        print(f"WARNING: Failed to fetch VIX data; reusing existing VHSI fallback: {exc}")
+        vix = (
+            existing[["Date", "VHSI"]]
+            .rename(columns={"VHSI": "VIX"})
+            .dropna(subset=["Date"])
+            .sort_values("Date")
+        )
 
     fit_h = _fit_linear(
         x=existing.merge(h_proxy, on="Date", how="inner")["HSTECH_proxy"],
