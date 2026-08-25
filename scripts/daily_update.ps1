@@ -47,6 +47,30 @@ function Invoke-Checked {
   }
 }
 
+function Invoke-CheckedWithRetry {
+  param(
+    [string]$Exe,
+    [string[]]$CmdArgs,
+    [int]$MaxAttempts = 3,
+    [int]$DelaySeconds = 8
+  )
+
+  for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+    try {
+      Invoke-Checked -Exe $Exe -CmdArgs $CmdArgs
+      return
+    }
+    catch {
+      if ($attempt -ge $MaxAttempts) {
+        throw
+      }
+      Write-Log "Attempt $attempt/$MaxAttempts failed: $($_.Exception.Message)"
+      Write-Log "Retrying in $DelaySeconds seconds..."
+      Start-Sleep -Seconds $DelaySeconds
+    }
+  }
+}
+
 function Invoke-PythonUpdate {
   param([string]$ScriptPath)
 
@@ -62,7 +86,7 @@ Write-Log "=== Daily update start ==="
 
 Push-Location $Repo
 try {
-  Invoke-Checked -Exe "git" -CmdArgs @("-c", "rebase.autoStash=true", "pull", "--rebase", "origin", "main")
+  Invoke-CheckedWithRetry -Exe "git" -CmdArgs @("-c", "rebase.autoStash=true", "pull", "--rebase", "origin", "main")
   Invoke-PythonUpdate -ScriptPath $PyScript
 
   git add -- "data/hsi5f.csv"
@@ -74,7 +98,7 @@ try {
 
   $msg = "Daily data update: $(Get-Date -Format 'yyyy-MM-dd')"
   Invoke-Checked -Exe "git" -CmdArgs @("commit", "-m", $msg)
-  Invoke-Checked -Exe "git" -CmdArgs @("push", "origin", "main")
+  Invoke-CheckedWithRetry -Exe "git" -CmdArgs @("push", "origin", "main")
 
   Write-Log "Commit + push completed."
 }
