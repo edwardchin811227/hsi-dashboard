@@ -41,6 +41,25 @@ canvas{width:100%;height:100%;display:block;background:#fff}
 .note{color:#64748b;font-size:12px;margin-left:8px}
 .err{color:#991b1b}.ok{color:#047857}
 #loading{position:fixed;inset:0;background:rgba(255,255,255,.8);display:none;align-items:center;justify-content:center;z-index:9999;font-size:20px}
+.events{margin:12px;border:1px solid var(--border);border-radius:12px;padding:10px 12px;display:none}
+.ev-head{display:flex;align-items:baseline;gap:10px;margin-bottom:6px}
+.ev-title{font-weight:700;font-size:13px}
+.ev-count{color:#6b7280;font-size:12px}
+.ev-note{color:#94a3b8;font-size:11px;margin-left:auto}
+.ev-rows{display:flex;flex-direction:column;gap:2px}
+.ev-row{display:grid;grid-template-columns:120px 64px 76px 1fr;gap:10px;align-items:center;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:12px}
+.ev-row:hover{background:#f0fdf4}
+.ev-row.is-active{background:#eef2ff}
+.ev-row-1d{background:#fffbeb;box-shadow:inset 3px 0 0 #f59e0b}
+.ev-row-1d:hover{background:#fef3c7}
+.ev-date{font-variant-numeric:tabular-nums}
+.ev-score{font-variant-numeric:tabular-nums;text-align:right;color:#374151;padding-right:10px;border-right:1px solid var(--border)}
+.ev-badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:700;text-align:center}
+.ev-badge.green{background:#d1fae5;color:#065f46}
+.ev-badge.red{background:#fee2e2;color:#991b1b}
+.ev-dur{color:#334155;display:flex;align-items:center;gap:8px;justify-content:flex-start;flex-wrap:wrap}
+.ev-badge.day1{background:#fef3c7;color:#92400e;outline:1px solid #f59e0b;font-weight:800}
+.ev-empty{color:#94a3b8;font-size:12px;padding:6px}
 </style>
 </head>
 <body>
@@ -91,6 +110,15 @@ canvas{width:100%;height:100%;display:block;background:#fff}
   </div>
   <div class="legend" id="rangeLabel" style="padding:0 12px 8px"></div>
 
+  <div class="events" id="eventsPanel">
+    <div class="ev-head">
+      <span class="ev-title">信號事件</span>
+      <span class="ev-count" id="evCount"></span>
+      <span class="ev-note">點擊列跳到該日</span>
+    </div>
+    <div class="ev-rows" id="evRows"></div>
+  </div>
+
   <div class="sliders">
     <div class="slider start"><label>Start</label><input id="sStart" type="range" min="0" max="100" value="0"></div>
     <div class="slider mid"><label>Mid</label><input id="sMid" type="range" min="0" max="100" value="50"></div>
@@ -113,6 +141,8 @@ const showCNH=$('#showCNH'), showVHSI=$('#showVHSI'), showBTC=$('#showBTC');
 const thrGEl=$('#thrG'), thrREl=$('#thrR'); const sStart=$('#sStart'), sMid=$('#sMid'), sEnd=$('#sEnd');
 const rangeLabel=$('#rangeLabel'); const btnAll=$('#btnAll'); const kbEnable=$('#kbEnable'); const btnReset=$('#btnReset');
 const btnRefresh=$('#btnRefresh'), srcMsg=$('#srcMsg');
+const eventsPanel=$('#eventsPanel'), evRows=$('#evRows'), evCount=$('#evCount');
+let lastComp=[];
 
 function isNum(v){ return Number.isFinite(v); }
 function SMA(a,n,i){
@@ -206,6 +236,7 @@ function loadState(){ try{ return JSON.parse(localStorage.getItem(KEY_STATE)||'n
 function draw(){
   const thrG=parseFloat(thrGEl.value||0.5), thrR=parseFloat(thrREl.value||-0.5);
   const comp=compute(rows,thrG,thrR);
+  lastComp=comp;
   ctx.clearRect(0,0,c.clientWidth,c.clientHeight);
   const W=c.clientWidth,H=c.clientHeight;
   if(comp.length===0){stateBadge.textContent='狀態：—';stateBadge.className='badge status';rangeLabel.textContent='';return;}
@@ -239,8 +270,47 @@ function draw(){
     tip.innerHTML = 'Date: '+d.date+'<br>Score: '+d.disp.toFixed(2)+'<br>狀態：'+d.state+'<br>Amber: '+(d.amber?'有':'無')+'　Red: '+(d.red?'有':'無');
     const tw=tip.offsetWidth,th=tip.offsetHeight; const lx=Math.max(r.left+8, Math.min(ev.clientX+12, r.right-tw-8)); const ty=Math.max(r.top+8, Math.min(ev.clientY-th-12, r.bottom-th-8));
     tip.style.left=lx+'px'; tip.style.top=ty+'px'; };
-  c.onmouseleave=function(){ tip.style.opacity=0; }; saveState();
+  c.onmouseleave=function(){ tip.style.opacity=0; }; renderEvents(); saveState();
 }
+
+function renderEvents(){
+  const comp=lastComp; if(!comp || comp.length===0){ eventsPanel.style.display='none'; return; }
+  // Group consecutive same-state runs across the WHOLE dataset.
+  const runs=[]; let i=0;
+  while(i<comp.length){
+    const st=comp[i].state; let j=i;
+    while(j<comp.length && comp[j].state===st) j++;
+    if(st==='Green'||st==='Red') runs.push({state:st, startIdx:i, endIdx:j-1, startDate:comp[i].date, endDate:comp[j-1].date, days:j-i});
+    i=j;
+  }
+  if(runs.length===0){ eventsPanel.style.display='none'; return; }
+  // Show the most recent signals (regardless of window), newest first, capped for brevity.
+  const MAX_RUNS=12;
+  const recent=runs.slice(-MAX_RUNS).reverse();
+  let g=0,r=0; recent.forEach(function(x){ if(x.state==='Green')g++; else r++; });
+  evCount.textContent='最近 '+recent.length+' 個事件　Green '+g+'　Red '+r;
+  evRows.innerHTML=''; eventsPanel.style.display='block';
+  recent.forEach(function(run){
+    const row=document.createElement('div');
+    const is1 = run.days===1;
+    row.className='ev-row'+(is1?' ev-row-1d':'');
+    row.dataset.idx=run.startIdx;
+    row.innerHTML='<span class="ev-date">'+run.startDate+'</span>'+
+      '<span class="ev-score">'+comp[run.startIdx].disp.toFixed(2)+'</span>'+
+      '<span class="ev-badge '+(run.state==='Green'?'green':'red')+'">'+run.state+'</span>'+
+      '<span class="ev-dur">'+run.days+' 天 '+(is1?'<span class="ev-badge day1">僅1天</span>':'')+'</span>';
+    evRows.appendChild(row);
+  });
+}
+evRows.addEventListener('click',function(ev){
+  const row=ev.target.closest('.ev-row'); if(!row) return;
+  const idx=parseInt(row.dataset.idx,10);
+  [].forEach.call(evRows.children,function(ch){ch.classList.remove('is-active');});
+  row.classList.add('is-active');
+  const n=rows.length; const span=Math.max(MIN_VIEW_DAYS, Math.min(DEFAULT_VIEW_DAYS, end-start));
+  let ns=clamp(idx-Math.round(span/2), 0, Math.max(0,n-span));
+  start=ns; end=Math.min(n, ns+span); applyBounds(n); draw();
+});
 
 function hookSliders(){ const n=rows.length;if(n===0) return;
   sStart.oninput=function(){ const n=rows.length; const minSpan=Math.max(1, Math.min(5, n-1)); start=parseInt(sStart.value); end=Math.max(start+minSpan, end); applyBounds(n); draw(); saveState(); btnAll.classList.remove('active'); };
