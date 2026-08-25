@@ -50,13 +50,12 @@ canvas{width:100%;height:100%;display:block;background:#fff}
 .ev-count{color:#6b7280;font-size:12px}
 .ev-note{color:#94a3b8;font-size:11px;margin-left:auto}
 .ev-rows{display:flex;flex-direction:column;gap:2px}
-.ev-row{display:grid;grid-template-columns:120px 64px 76px 1fr;gap:10px;align-items:center;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:12px}
+.ev-row{display:grid;grid-template-columns:200px 76px 1fr;gap:10px;align-items:center;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:12px}
 .ev-row:hover{background:#f0fdf4}
 .ev-row.is-active{background:#eef2ff}
 .ev-row-1d{background:#fffbeb;box-shadow:inset 3px 0 0 #f59e0b}
 .ev-row-1d:hover{background:#fef3c7}
 .ev-date{font-variant-numeric:tabular-nums}
-.ev-score{font-variant-numeric:tabular-nums;text-align:right;color:#374151;padding-right:10px;border-right:1px solid var(--border)}
 .ev-badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:700;text-align:center}
 .ev-badge.green{background:#d1fae5;color:#065f46}
 .ev-badge.red{background:#fee2e2;color:#991b1b}
@@ -313,8 +312,8 @@ function renderEvents(){
     const is1 = run.days===1;
     row.className='ev-row'+(is1?' ev-row-1d':'');
     row.dataset.idx=run.startIdx;
-    row.innerHTML='<span class="ev-date">'+run.startDate+'</span>'+
-      '<span class="ev-score">'+comp[run.startIdx].disp.toFixed(2)+'</span>'+
+    const rangeTxt = (run.days>1 && run.endDate!==run.startDate) ? run.startDate+' ~ '+run.endDate : run.startDate;
+    row.innerHTML='<span class="ev-date">'+rangeTxt+'</span>'+
       '<span class="ev-badge '+(run.state==='Green'?'green':'red')+'">'+run.state+'</span>'+
       '<span class="ev-dur">'+run.days+' 天 '+(is1?'<span class="ev-badge day1">僅1天</span>':'')+'</span>';
     evRows.appendChild(row);
